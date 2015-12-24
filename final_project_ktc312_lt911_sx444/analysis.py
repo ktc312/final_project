@@ -13,6 +13,9 @@ from statsmodels.graphics.tsaplots import plot_acf
 from statsmodels.graphics.tsaplots import plot_pacf
 from statsmodels.tsa.arima_model import ARIMA
 
+import warnings
+warnings.filterwarnings("ignore")
+
 class Analysis:
     '''class which deals with all the analytical procedures'''
 
@@ -135,6 +138,8 @@ class Analysis:
                     arima_mod = ARIMA(ts.dropna(), order).fit(method = 'css-mle', disp = 0)
                     arima_mod_aics[params] = arima_mod.aic
                 except:
+#                    arima_mod = ARIMA(ts.dropna(), order).fit(method = 'css', disp = 0 )
+#                    print "error raised due to mle method warrning"
                     pass
         return arima_mod_aics
 
@@ -154,8 +159,12 @@ class Analysis:
     def arima_model(self):
         ''' uses parameter order determined in param_determination() to fit an ARIMA model, returns model results'''
         order = self.param_determination()
-        self.results = ARIMA(self.ts, order).fit(method = 'css-mle', disp = 0 )
-        return self.results
+	try:
+            self.results = ARIMA(self.ts, order).fit(method = 'css-mle', disp = 0 )
+            return self.results
+        except:
+            self.results = ARIMA(self.ts, order).fit(method = 'css', disp = 0 )
+            return self.results
 
     def predict_val(self):
         '''using arima model to forecast the stock values in the next 7 days'''
@@ -175,30 +184,31 @@ class Analysis:
     def predict_plot(self):
         '''generate prediction plot'''
         pred_df =  self.predict_val()
-        pred_time = pred_df.index
+        pred_time = pred_df.index.astype(datetime)
         pred_vals = pred_df['Price']
+        scale1 = np.mean(self.val)
+        scale2 = np.mean(self.val[-40:])
 
         fig = plt.figure(figsize = (12, 8))
         ax1 = fig.add_subplot(211)
-        ax1.plot(self.date, self.val, '-b', label = 'original data')
-        ax1.plot(pred_time, pred_vals, '-r', label = 'predicted values')
+        ax1.plot_date(self.date.astype(datetime), self.val, '-b', label = 'original data')
+        ax1.plot_date(pred_time, pred_vals, '-r', label = 'predicted values')
         ax1.annotate("Forecast",
             xy=(pred_time[0], pred_vals[0]), xycoords='data',
-            xytext=(pred_time[-1] + timedelta(1), pred_vals[0]+2), textcoords='data',
-            arrowprops=dict(arrowstyle="->",
+            xytext=(pred_time[-1] + timedelta(1), scale1), textcoords='data',
+            arrowprops=dict(arrowstyle="fancy",
                             connectionstyle="arc3"),
             )
         ax1.set_title('Full plot')
         plt.legend(loc = 'upper left',fancybox = True)
 
-        base = self.ts.index[-60]
         ax2 = fig.add_subplot(212)
-        ax2.plot(self.ts.index[-60:], self.ts.Price[-60:], '-b', label = 'original data')
-        ax2.plot(pred_time, pred_vals,'+r',label = 'predicted values' )
+        ax2.plot_date(self.ts.index[-40:].astype(datetime), self.ts.Price[-40:], '-b', label = 'original data')
+        ax2.plot_date(pred_time, pred_vals,'+r',label = 'predicted values' )
         plt.xticks(rotation = 45)
         ax2.annotate("Forecast",
             xy=(pred_time[0], pred_vals[0]), xycoords='data',
-            xytext=(pred_time[-1] + timedelta(1), pred_vals[0]+2), textcoords='data',
+            xytext=(pred_time[-1] + timedelta(1), scale2), textcoords='data',
             arrowprops=dict(arrowstyle="fancy",
                             connectionstyle="arc3"),
             )
